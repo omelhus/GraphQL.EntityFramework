@@ -9,7 +9,7 @@ partial class EfGraphQLService<TDbContext>
     where TDbContext : DbContext
 {
     static MethodInfo addQueryableConnection = typeof(EfGraphQLService<TDbContext>)
-        .GetMethod("AddQueryableConnection", BindingFlags.Instance| BindingFlags.NonPublic)!;
+        .GetMethod("AddQueryableConnection", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     public void AddQueryConnectionField<TReturn>(
         IComplexGraphType graph,
@@ -72,6 +72,7 @@ partial class EfGraphQLService<TDbContext>
                     }
                     query = includeAppender.AddIncludes(query, context);
                     var names = GetKeyNames<TReturn>();
+                    query = selectAppender.AddSelect(query, names, context, true);
                     query = query.ApplyGraphQlArguments(context, names, true);
                     return query
                         .ApplyConnectionContext(

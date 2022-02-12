@@ -25,14 +25,15 @@ public partial class EfGraphQLService<TDbContext> :
         this.resolveDbContext = resolveDbContext;
 
         keyNames = model.GetKeyNames();
-
         Navigations = NavigationReader.GetNavigationProperties(model);
         includeAppender = new(Navigations);
+        selectAppender = new(model);
     }
 
     public IReadOnlyDictionary<Type, IReadOnlyList<Navigation>> Navigations { get; }
 
     IncludeAppender includeAppender;
+    SelectAppender selectAppender;
 
     ResolveEfFieldContext<TDbContext, TSource> BuildContext<TSource>(
         IResolveFieldContext<TSource> context)

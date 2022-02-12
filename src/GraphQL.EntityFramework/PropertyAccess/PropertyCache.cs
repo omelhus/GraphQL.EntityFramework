@@ -3,7 +3,7 @@
 static class PropertyCache<TInput>
 {
     public static ParameterExpression SourceParameter = Expression.Parameter(typeof(TInput));
-    static ConcurrentDictionary<string, Property<TInput>> properties = new();
+    static ConcurrentDictionary<string, Property<TInput>> properties = new(StringComparer.InvariantCultureIgnoreCase);
 
     public static Property<TInput> GetProperty(string path)
     {

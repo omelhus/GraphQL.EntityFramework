@@ -66,6 +66,7 @@ partial class EfGraphQLService<TDbContext>
                     }
 
                     query = includeAppender.AddIncludes(query, context);
+                    query = selectAppender.AddSelect(query, names, context);
                     query = query.ApplyGraphQlArguments(context, names, true);
 
                     QueryLogger.Write(query);
