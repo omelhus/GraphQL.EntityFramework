@@ -64,7 +64,17 @@ public class ExpressionHelper
                 }
             }
 
-            bindings.Add(Expression.Bind(targetMember.Member, targetValue));
+            if (sourceMember.Type.GetTypeInfo().IsClass)
+            {
+                var valueToCheck = Expression.PropertyOrField(source, memberName);
+                var nullCheck = Expression.Equal(valueToCheck, Expression.Constant(null, sourceMember.Type));
+                var checkForNull = Expression.Condition(nullCheck, Expression.Default(targetMember.Type), targetValue);
+                bindings.Add(Expression.Bind(targetMember.Member, checkForNull));
+            }
+            else
+            {
+                bindings.Add(Expression.Bind(targetMember.Member, targetValue));
+            }
         }
         return Expression.MemberInit(Expression.New(targetType), bindings);
     }
