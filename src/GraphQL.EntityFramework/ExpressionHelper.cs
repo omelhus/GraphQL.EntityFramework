@@ -1,14 +1,10 @@
 ﻿using GraphQL.Language.AST;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 
 namespace GraphQL.EntityFramework;
 
 public class ExpressionHelper
 {
-    public static Expression<Func<TSource, TTarget>> BuildSelector<TSource, TTarget>(string members) =>
-        BuildSelector<TSource, TTarget>(members.Split(',').Select(m => m.Trim()));
-
     public static Expression<Func<TSource, TTarget>> BuildSelector<TSource, TTarget>(IEnumerable<string> members)
     {
         var parameter = Expression.Parameter(typeof(TSource), "e");
@@ -116,51 +112,19 @@ public class ExpressionHelper
 
         throw new NotImplementedException($"Not implemented transformation for type '{memberType.Name}'");
     }
-    /// <summary>
-    /// Generates a 't => new T { Member = t.Member, Member2 = t.Member2 }' type of expression, mostly used for EFCore Select queries.
-    /// </summary>
-    /// <param name="selectProperties"></param>
-    /// <returns></returns>
-    public static Expression<Func<T, T>> BuildSelectExpression<T>([NotNull] IEnumerable<string> selectProperties)
-    {
-        if (selectProperties == null)
-            throw new ArgumentNullException(nameof(selectProperties));
-
-        // t =>
-        var x = Expression.Parameter(typeof(T), "x");
-
-        var bindings = new List<MemberBinding>();
-
-        //var properties = typeof(T).GetMembers().ToDictionary(l => l.Name, StringComparer.OrdinalIgnoreCase);
-        // Member = t.Member
-        // Member2 = a.Member2
-        foreach (var sf in selectProperties)
-        {
-            var prop = PropertyCache<T>.GetProperty(sf);
-            if (prop != null)
-                bindings.Add(Expression.Bind(prop.Info, Expression.MakeMemberAccess(x, prop.Info)));
-        }
-
-        // => new TType { ... bindings ... }
-        var newBody = Expression.MemberInit(Expression.New(typeof(T)), bindings);
-
-
-        // t => new TType { Member = t.Member }
-        return Expression.Lambda<Func<T, T>>(newBody, x);
-    }
 }
 
 public static class ResolveFieldContextExtensions
 {
     public static HashSet<string> GetQuerySelections(this IResolveFieldContext context)
     {
-        var results = new HashSet<string>();
+        var results = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
 
         foreach (var node in context.Operation.SelectionSet.Children)
         {
             if (node is Field f)
             {
-                var subResults = ResolveFieldContextExtensions.GetQuerySelections(string.Empty, f);
+                var subResults = ResolveFieldContextExtensions.GetQuerySelections(string.Empty, f, context);
                 foreach (var subResult in subResults)
                 {
                     results.Add(subResult);
@@ -169,22 +133,39 @@ public static class ResolveFieldContextExtensions
         }
         return results;
     }
-
-    private static HashSet<string> GetQuerySelections(string hierarchy, Field field)
+    static bool IsConnectionNode(Field field)
     {
-        var results = new HashSet<string>();
+        var name = field.Name.ToLowerInvariant();
+        return name is "edges" or "items" or "node";
+    }
 
-        hierarchy = string.Format("{0}{1}", hierarchy, field.Name);
-        results.Add(hierarchy);
+    private static HashSet<string> GetQuerySelections(string hierarchy, Field field, IResolveFieldContext context)
+    {
+        var results = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
+        if (!IsConnectionNode(field) && field != context.FieldAst)
+        {
+            hierarchy = string.Format("{0}{1}", hierarchy, field.Name);
+            results.Add(hierarchy);
+        }
 
         foreach (var node in field.SelectionSet!.Children)
         {
             if (node is Field f)
             {
-                var subResults = ResolveFieldContextExtensions.GetQuerySelections(hierarchy + ".", f);
+                var subResults = ResolveFieldContextExtensions.GetQuerySelections(!string.IsNullOrEmpty(hierarchy) ? hierarchy + "." : string.Empty, f, context);
                 foreach (var subResult in subResults)
                 {
                     results.Add(subResult);
+                }
+                if (f.Arguments != null && f.Arguments.Children != null)
+                {
+                    foreach (Argument argument in f.Arguments.Children)
+                    {
+                        if (argument.Name == "field" && argument?.Value?.Value != null)
+                        {
+                            results.Add(argument?.Value?.Value?.ToString() ?? string.Empty);
+                        }
+                    }
                 }
             }
         }

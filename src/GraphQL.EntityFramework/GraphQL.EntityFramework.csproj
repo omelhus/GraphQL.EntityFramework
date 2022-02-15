@@ -2,8 +2,9 @@
   <PropertyGroup>
     <TargetFrameworks>net6</TargetFrameworks>
     <Description>Add EntityFramework Core IQueryable support to GraphQL</Description>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
   </PropertyGroup>
-  
+	
   <ItemGroup>
     <PackageReference Include="ConfigureAwait.Fody" Version="3.3.1" PrivateAssets="All" />
     <PackageReference Include="Fody" Version="6.6.0" PrivateAssets="all" />
