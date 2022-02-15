@@ -1,6 +1,6 @@
-﻿using System.Linq.Expressions;
-using GraphQL.Types;
+﻿using GraphQL.Types;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace GraphQL.EntityFramework;
 
@@ -136,7 +136,7 @@ public static class Mapper<TDbContext>
     {
         var graphTypeFromType = GraphTypeFromType(navigation.Name, navigation.Type, false);
         var compile = NavigationFunc<TSource, IEnumerable<TReturn>>(navigation.Name);
-        graphQlService.AddNavigationListField(graph, navigation.Name, compile, graphTypeFromType);
+        graphQlService.AddNavigationListField(graph, navigation.Name, compile, graphTypeFromType, includeNames: new[] { navigation.Name });
     }
 
     public record NavigationKey(Type Type, string Name);
