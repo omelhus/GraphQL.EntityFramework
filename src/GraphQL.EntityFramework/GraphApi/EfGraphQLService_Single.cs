@@ -94,7 +94,7 @@ partial class EfGraphQLService<TDbContext>
 
                     QueryLogger.Write(query);
 
-                    var single = await query.SingleOrDefaultAsync(context.CancellationToken);
+                    var single = await query.FirstOrDefaultAsync(context.CancellationToken);
 
                     if (single is not null)
                     {
