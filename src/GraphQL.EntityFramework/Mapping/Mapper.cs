@@ -1,5 +1,6 @@
 ﻿using GraphQL.Types;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq.Expressions;
 
 namespace GraphQL.EntityFramework;
@@ -29,10 +30,11 @@ public static class Mapper<TDbContext>
     static MethodInfo addNavigationMethod = typeof(Mapper<TDbContext>).GetMethod(nameof(AddNavigation), bindingFlags)!;
     static MethodInfo addNavigationListMethod = typeof(Mapper<TDbContext>).GetMethod(nameof(AddNavigationList), bindingFlags)!;
 
-    internal static void AutoMap<TSource>(
+    public static void AutoMap<TSource>(
         ObjectGraphType<TSource> graph,
         IEfGraphQLService<TDbContext> graphService,
-        IReadOnlyList<string>? exclusions = null)
+        IReadOnlyList<string>? exclusions = null,
+        Dictionary<string, string>? nameMapping = null)
     {
         var type = typeof(TSource);
         try
@@ -53,7 +55,7 @@ public static class Mapper<TDbContext>
                 list.AddRange(navigations.Select(x => x.Name));
             }
 
-            MapProperties(graph, type, list);
+            MapProperties(graph, type, list, nameMapping);
         }
         catch (GetGraphException exception)
         {
@@ -61,18 +63,47 @@ public static class Mapper<TDbContext>
         }
     }
 
-    static void MapProperties<TSource>(ComplexGraphType<TSource> graph, Type type, IReadOnlyList<string>? exclusions)
+    public static void AutoMapInputType<TSource>(
+        InputObjectGraphType<TSource> graph,
+        IEfGraphQLService<TDbContext> graphService,
+        IReadOnlyList<string>? exclusions = null,
+        Dictionary<string, string>? nameMapping = null)
+    {
+        var type = typeof(TSource);
+        try
+        {
+            var list = new List<string>();
+            if (exclusions is not null)
+            {
+                list.AddRange(exclusions);
+            }
+
+            MapProperties(graph, type, list, nameMapping, true);
+        }
+        catch (GetGraphException exception)
+        {
+            throw new($"Failed to map '{graph.GetType().Name}'. {exception.Message}");
+        }
+    }
+
+    static void MapProperties<TSource>(ComplexGraphType<TSource> graph, Type type, IReadOnlyList<string>? exclusions, Dictionary<string, string>? nameMapping = null, bool forceNullable = false)
     {
         var publicProperties = type.GetPublicProperties()
             .OrderBy(x => x.Name);
+
         foreach (var property in publicProperties)
         {
-            if (ShouldIgnore(graph, property.Name, property.PropertyType, exclusions))
+            var propertyName = property.Name;
+            propertyName = property.GetCustomAttribute<ColumnAttribute>()?.Name ?? propertyName;
+            if (nameMapping != null && nameMapping.TryGetValue(propertyName, out var mappedName))
+                propertyName = mappedName;
+
+            if (ShouldIgnore(graph, propertyName, property.PropertyType, exclusions))
             {
                 continue;
             }
 
-            AddMember(graph, property);
+            AddMember(graph, property, propertyName, forceNullable);
         }
     }
 
@@ -165,12 +196,14 @@ public static class Mapper<TDbContext>
         return Expression.Lambda<Func<ResolveEfFieldContext<TDbContext, TSource>, TReturn>>(property, parameter);
     }
 
-    static void AddMember<TSource>(ComplexGraphType<TSource> graph, PropertyInfo property)
+    static void AddMember<TSource>(ComplexGraphType<TSource> graph, PropertyInfo property, string? propertyName = null, bool forceNullable = false)
     {
-        var (compile, propertyGraphType) = Compile<TSource>(property);
+        var (compile, propertyGraphType) = Compile<TSource>(property, forceNullable);
         var resolver = new SimpleFieldResolver<TSource>(compile);
-        var graphQlField = graph.Field(type: propertyGraphType, name: property.Name);
+
+        var graphQlField = graph.Field(type: propertyGraphType, name: propertyName ?? property.Name);
         graphQlField.Resolver = resolver;
+        graphQlField.Metadata["_EF_PropertyName"] = property.Name;
     }
 
     static bool ShouldIgnore(IComplexGraphType graphType, string name, Type propertyType, IReadOnlyList<string>? localIgnores = null)
@@ -201,10 +234,10 @@ public static class Mapper<TDbContext>
         return false;
     }
 
-    static (Func<TSource, object> resolver, Type graphType) Compile<TSource>(PropertyInfo member)
+    static (Func<TSource, object> resolver, Type graphType) Compile<TSource>(PropertyInfo member, bool forceNullable = false)
     {
         var func = PropertyCache<TSource>.GetProperty(member.Name).Func;
-        var graphTypeFromType = GraphTypeFromType(member.Name, member.PropertyType, member.IsNullable());
+        var graphTypeFromType = GraphTypeFromType(member.Name, member.PropertyType, forceNullable || member.IsNullable());
         return (func, graphTypeFromType);
     }
 

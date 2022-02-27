@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 
-record Property<TInput>(
+public record Property<TInput>(
     Expression Left,
     Expression<Func<TInput, object>> Lambda,
     ParameterExpression SourceParameter,
