@@ -1,6 +1,5 @@
 ﻿using GraphQL.Builders;
 using GraphQL.Types;
-using GraphQL.Types.Relay;
 using Microsoft.EntityFrameworkCore;
 
 namespace GraphQL.EntityFramework;
@@ -9,7 +8,7 @@ partial class EfGraphQLService<TDbContext>
     where TDbContext : DbContext
 {
     static MethodInfo addEnumerableConnection = typeof(EfGraphQLService<TDbContext>)
-        .GetMethod("AddEnumerableConnection", BindingFlags.Instance| BindingFlags.NonPublic)!;
+        .GetMethod("AddEnumerableConnection", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     public void AddNavigationConnectionField<TSource, TReturn>(
         ComplexGraphType<TSource> graph,
@@ -75,7 +74,7 @@ partial class EfGraphQLService<TDbContext>
         }
 
         // TODO: works around https://github.com/graphql-dotnet/graphql-dotnet/pull/2581/
-        builder.FieldType.Type = typeof(NonNullGraphType<ConnectionType<TGraph, EdgeType<TGraph>>>);
+        builder.FieldType.Type = typeof(NonNullGraphType<EfGenericConnectionType<TGraph, EfGenericEdgeType<TGraph>>>);
         var field = graph.AddField(builder.FieldType);
 
         field.AddWhereArgument(hasId, arguments);

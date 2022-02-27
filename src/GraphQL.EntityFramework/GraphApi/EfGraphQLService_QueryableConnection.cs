@@ -1,6 +1,5 @@
 ﻿using GraphQL.Builders;
 using GraphQL.Types;
-using GraphQL.Types.Relay;
 using Microsoft.EntityFrameworkCore;
 
 namespace GraphQL.EntityFramework;
@@ -53,12 +52,12 @@ partial class EfGraphQLService<TDbContext>
     {
         var builder = ConnectionBuilder.Create<TGraph, TSource>();
         builder.Name(name);
+
         if (description is not null)
         {
             builder.Description(description);
         }
         builder.PageSize(pageSize).Bidirectional();
-
         if (resolve is not null)
         {
             builder.Resolve(
@@ -68,7 +67,7 @@ partial class EfGraphQLService<TDbContext>
                     var query = resolve(efFieldContext);
                     if (disableTracking)
                     {
-                        query = query.AsNoTracking();
+                        query = query.AsNoTrackingWithIdentityResolution();
                     }
                     query = includeAppender.AddIncludes(query, context);
                     var names = GetKeyNames<TReturn>();
@@ -87,7 +86,8 @@ partial class EfGraphQLService<TDbContext>
         }
 
         // TODO: works around https://github.com/graphql-dotnet/graphql-dotnet/pull/2581/
-        builder.FieldType.Type = typeof(NonNullGraphType<ConnectionType<TGraph, EdgeType<TGraph>>>);
+        builder.FieldType.Type = typeof(NonNullGraphType<EfGenericConnectionType<TGraph, EfGenericEdgeType<TGraph>>>);
+
         var field = graph.AddField(builder.FieldType);
 
         var hasId = keyNames.ContainsKey(typeof(TReturn));
