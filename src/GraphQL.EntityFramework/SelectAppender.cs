@@ -15,39 +15,44 @@ public class SelectAppender
        where TItem : class
     {
         if (context.SubFields is null)
-        {
             return query;
-        }
 
-        var selections = context.GetQuerySelections();
-
+        var selections = BuildFieldSelector(new[] { FieldContext.FromContext(context) }).ToHashSet();
         if (keys?.Any() == true)
             foreach (var key in keys)
                 selections.Add(key!);
 
         var selector = ExpressionHelper.BuildSelector<TItem, TItem>(selections);
-        query = query.Select(selector);
-
-        return query;
+        return query.Select(selector);
     }
 
-    internal static void SetIncludeMetadata(Type type, string selectName, IDictionary<string, object?> metadata)
+    static bool IsConnectionNode(FieldContext field)
     {
-        if (!metadata.TryGetValue("_EF_SelectName", out var setObject))
-        {
-            metadata["_EF_SelectName"] = new HashSet<(Type type, string name)>(new[] { (type, selectName) });
-        }
-        else if (setObject is HashSet<(Type type, string name)> set)
-        {
-            set.Add((type, selectName));
-        }
+        var name = field.Name.ToLowerInvariant();
+        return name is "edges" or "items" or "node";
     }
-}
 
-public static class SelectAppenderExtensions
-{
-    public static void IncludeField<T>(this IResolveFieldContext<T> context, string fieldName)
+    public IEnumerable<string> BuildFieldSelector(IEnumerable<FieldContext> fields, FieldContext? parent = null)
     {
-        SelectAppender.SetIncludeMetadata(typeof(T), fieldName, context.UserContext);
+        foreach (var field in fields)
+        {
+            if (parent != null && !IsConnectionNode(field))
+            {
+                if (!field.FieldDefinition.Metadata.TryGetValue("_EF_PropertyName", out var selectName))
+                    selectName = field.Name;
+                if (parent != null && !IsConnectionNode(parent))
+                {
+                    if (!parent.FieldDefinition.Metadata.TryGetValue("_EF_PropertyName", out var parentName))
+                        parentName = parent.Name;
+                    yield return $"{parentName}.{selectName}";
+                }
+                else
+                {
+                    yield return $"{selectName}";
+                }
+            }
+            foreach (var sub in BuildFieldSelector(field.Fields, field))
+                yield return sub;
+        }
     }
 }

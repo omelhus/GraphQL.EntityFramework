@@ -1,5 +1,4 @@
-﻿using GraphQL.Language.AST;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 
 namespace GraphQL.EntityFramework;
 
@@ -111,65 +110,5 @@ public class ExpressionHelper
             return Expression.Call(typeof(Enumerable), nameof(Enumerable.ToList), new[] { elementType }, enumerable);
 
         throw new NotImplementedException($"Not implemented transformation for type '{memberType.Name}'");
-    }
-}
-
-public static class ResolveFieldContextExtensions
-{
-    public static HashSet<string> GetQuerySelections(this IResolveFieldContext context)
-    {
-        var results = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
-
-        foreach (var node in context.Operation.SelectionSet.Children)
-        {
-            if (node is Field f)
-            {
-                var subResults = ResolveFieldContextExtensions.GetQuerySelections(string.Empty, f, context);
-                foreach (var subResult in subResults)
-                {
-                    results.Add(subResult);
-                }
-            }
-        }
-        return results;
-    }
-    static bool IsConnectionNode(Field field)
-    {
-        var name = field.Name.ToLowerInvariant();
-        return name is "edges" or "items" or "node";
-    }
-
-    private static HashSet<string> GetQuerySelections(string hierarchy, Field field, IResolveFieldContext context)
-    {
-        var results = new HashSet<string>(StringComparer.InvariantCultureIgnoreCase);
-        if (!IsConnectionNode(field) && field != context.FieldAst)
-        {
-            hierarchy = string.Format("{0}{1}", hierarchy, field.Name);
-            results.Add(hierarchy);
-        }
-
-        foreach (var node in field.SelectionSet!.Children)
-        {
-            if (node is Field f)
-            {
-                var subResults = ResolveFieldContextExtensions.GetQuerySelections(!string.IsNullOrEmpty(hierarchy) ? hierarchy + "." : string.Empty, f, context);
-                foreach (var subResult in subResults)
-                {
-                    results.Add(subResult);
-                }
-                if (f.Arguments != null && f.Arguments.Children != null)
-                {
-                    foreach (Argument argument in f.Arguments.Children)
-                    {
-                        if (argument.Name == "field" && argument?.Value?.Value != null)
-                        {
-                            results.Add(argument?.Value?.Value?.ToString() ?? string.Empty);
-                        }
-                    }
-                }
-            }
-        }
-
-        return results;
     }
 }
