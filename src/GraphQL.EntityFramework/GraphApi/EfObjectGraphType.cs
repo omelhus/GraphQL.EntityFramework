@@ -22,9 +22,9 @@ public class EfObjectGraphType<TDbContext, TSource> :
     ///  * Calls <see cref="ComplexGraphType{TSourceType}.AddField"/> for all other properties
     /// </summary>
     /// <param name="exclusions">A list of property names to exclude from mapping.</param>
-    public void AutoMap(IReadOnlyList<string>? exclusions = null)
+    public void AutoMap(IReadOnlyList<string>? exclusions = null, Dictionary<string, string>? nameMapping = null)
     {
-        Mapper<TDbContext>.AutoMap(this, GraphQlService, exclusions);
+        Mapper<TDbContext>.AutoMap(this, GraphQlService, exclusions, nameMapping);
     }
 
     public void AddNavigationConnectionField<TReturn>(
